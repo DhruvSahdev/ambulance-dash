@@ -40,22 +40,38 @@ function buildPath(parent: number[], dest: number): number[] {
   return path.reverse();
 }
 
-// Default sample city — laid out nicely on the canvas
+// Default sample city — 15 locations laid out nicely on the canvas
 const defaultNodes = [
-  { x: 100, y: 240, label: "0" },
-  { x: 280, y: 100, label: "1" },
-  { x: 280, y: 380, label: "2" },
-  { x: 500, y: 240, label: "3" },
-  { x: 700, y: 120, label: "4" },
-  { x: 700, y: 360, label: "5" },
+  { x: 80,  y: 240, label: "0" },
+  { x: 180, y: 100, label: "1" },
+  { x: 180, y: 380, label: "2" },
+  { x: 300, y: 200, label: "3" },
+  { x: 300, y: 320, label: "4" },
+  { x: 420, y: 80,  label: "5" },
+  { x: 420, y: 240, label: "6" },
+  { x: 420, y: 400, label: "7" },
+  { x: 540, y: 160, label: "8" },
+  { x: 540, y: 320, label: "9" },
+  { x: 660, y: 100, label: "10" },
+  { x: 660, y: 240, label: "11" },
+  { x: 660, y: 380, label: "12" },
+  { x: 780, y: 170, label: "13" },
+  { x: 780, y: 330, label: "14" },
 ];
 
-const defaultRoads = "0 1 4\n0 2 2\n1 2 1\n1 3 5\n2 3 8\n3 4 6\n3 5 3\n4 5 2";
+const defaultRoads = [
+  "0 1 4", "0 2 3", "1 3 2", "2 4 2", "1 2 5",
+  "3 4 3", "3 5 4", "3 6 2", "4 6 3", "4 7 4",
+  "5 6 2", "6 7 3", "5 8 5", "6 8 2", "6 9 3",
+  "7 9 2", "8 9 4", "8 10 3", "8 11 2", "9 11 3",
+  "9 12 4", "10 11 2", "11 12 3", "10 13 4", "11 13 2",
+  "11 14 3", "12 14 2", "13 14 5"
+].join("\n");
 
 const Index = () => {
   const [roadsInput, setRoadsInput] = useState(defaultRoads);
   const [accident, setAccident] = useState("0");
-  const [hospitals, setHospitals] = useState("4, 5");
+  const [hospitals, setHospitals] = useState("13, 14");
   const [path, setPath] = useState<number[]>([]);
   const [resultInfo, setResultInfo] = useState<{ time: number; hospital: number } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -170,7 +186,7 @@ const Index = () => {
             <div>
               <h2 className="font-semibold mb-1">Controls</h2>
               <p className="text-xs text-muted-foreground">
-                City has 6 locations (0–5). Edit roads or pick different points.
+                City has 15 locations (0–14). Edit roads or pick different points.
               </p>
             </div>
 
