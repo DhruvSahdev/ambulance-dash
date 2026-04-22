@@ -54,6 +54,15 @@ const CityMap = ({
     };
   }, [isPlaying, path, onAnimationEnd]);
 
+  // Compute logical bounds from node positions for auto-fit
+  const padding = 50;
+  const minX = Math.min(...nodes.map((n) => n.x)) - padding;
+  const maxX = Math.max(...nodes.map((n) => n.x)) + padding;
+  const minY = Math.min(...nodes.map((n) => n.y)) - padding;
+  const maxY = Math.max(...nodes.map((n) => n.y)) + padding;
+  const logicalW = maxX - minX;
+  const logicalH = maxY - minY;
+
   // Draw the graph
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -65,8 +74,16 @@ const CityMap = ({
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, rect.width, rect.height);
+
+    // Fit logical coordinates into the visible canvas
+    const scale = Math.min(rect.width / logicalW, rect.height / logicalH);
+    const offsetX = (rect.width - logicalW * scale) / 2 - minX * scale;
+    const offsetY = (rect.height - logicalH * scale) / 2 - minY * scale;
+    const tx = (x: number) => x * scale + offsetX;
+    const ty = (y: number) => y * scale + offsetY;
 
     const styles = getComputedStyle(document.documentElement);
     const fg = `hsl(${styles.getPropertyValue("--foreground")})`;
@@ -76,7 +93,6 @@ const CityMap = ({
     const card = `hsl(${styles.getPropertyValue("--card")})`;
     const destructive = `hsl(${styles.getPropertyValue("--destructive")})`;
 
-    // Build path edge set for highlight
     const pathEdges = new Set<string>();
     for (let i = 0; i < path.length - 1; i++) {
       const a = path[i];
@@ -84,7 +100,6 @@ const CityMap = ({
       pathEdges.add(`${Math.min(a, b)}-${Math.max(a, b)}`);
     }
 
-    // Draw edges
     const drawnEdges = new Set<string>();
     edges.forEach((edgeList, from) => {
       edgeList.forEach(({ to, time }) => {
@@ -95,38 +110,40 @@ const CityMap = ({
         const b = nodes[to];
         if (!a || !b) return;
 
+        const ax = tx(a.x), ay = ty(a.y);
+        const bx = tx(b.x), by = ty(b.y);
+
         const isOnPath = pathEdges.has(key);
         ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        ctx.moveTo(ax, ay);
+        ctx.lineTo(bx, by);
         ctx.strokeStyle = isOnPath ? primary : border;
         ctx.lineWidth = isOnPath ? 4 : 2;
         ctx.stroke();
 
-        // Time label
-        const mx = (a.x + b.x) / 2;
-        const my = (a.y + b.y) / 2;
+        const mx = (ax + bx) / 2;
+        const my = (ay + by) / 2;
         ctx.fillStyle = card;
         ctx.fillRect(mx - 14, my - 10, 28, 20);
         ctx.strokeStyle = isOnPath ? primary : border;
         ctx.lineWidth = 1;
         ctx.strokeRect(mx - 14, my - 10, 28, 20);
         ctx.fillStyle = isOnPath ? primary : muted;
-        ctx.font = "bold 12px system-ui";
+        ctx.font = "bold 11px system-ui";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(`${time}m`, mx, my);
       });
     });
 
-    // Draw nodes
     nodes.forEach((node, i) => {
+      const nx = tx(node.x), ny = ty(node.y);
       const isAccident = i === accident;
       const isHospital = hospitals.includes(i);
       const isOnPath = path.includes(i);
 
       ctx.beginPath();
-      ctx.arc(node.x, node.y, NODE_RADIUS, 0, Math.PI * 2);
+      ctx.arc(nx, ny, NODE_RADIUS, 0, Math.PI * 2);
       if (isAccident) ctx.fillStyle = destructive;
       else if (isHospital) ctx.fillStyle = primary;
       else ctx.fillStyle = card;
@@ -139,31 +156,31 @@ const CityMap = ({
         isAccident || isHospital
           ? `hsl(${styles.getPropertyValue("--primary-foreground")})`
           : fg;
-      ctx.font = "bold 14px system-ui";
+      ctx.font = "bold 13px system-ui";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(node.label, node.x, node.y);
+      ctx.fillText(node.label, nx, ny);
 
-      // Icon labels above node
       if (isAccident) {
         ctx.font = "16px system-ui";
         ctx.fillStyle = destructive;
-        ctx.fillText("⚠️", node.x, node.y - NODE_RADIUS - 12);
+        ctx.fillText("⚠️", nx, ny - NODE_RADIUS - 12);
       } else if (isHospital) {
         ctx.font = "16px system-ui";
         ctx.fillStyle = primary;
-        ctx.fillText("🏥", node.x, node.y - NODE_RADIUS - 12);
+        ctx.fillText("🏥", nx, ny - NODE_RADIUS - 12);
       }
     });
 
-    // Draw arrowheads on path edges (direction of travel)
     for (let i = 0; i < path.length - 1; i++) {
       const a = nodes[path[i]];
       const b = nodes[path[i + 1]];
       if (!a || !b) continue;
-      const angle = Math.atan2(b.y - a.y, b.x - a.x);
-      const tipX = b.x - Math.cos(angle) * (NODE_RADIUS + 4);
-      const tipY = b.y - Math.sin(angle) * (NODE_RADIUS + 4);
+      const ax = tx(a.x), ay = ty(a.y);
+      const bx = tx(b.x), by = ty(b.y);
+      const angle = Math.atan2(by - ay, bx - ax);
+      const tipX = bx - Math.cos(angle) * (NODE_RADIUS + 4);
+      const tipY = by - Math.sin(angle) * (NODE_RADIUS + 4);
       ctx.beginPath();
       ctx.moveTo(tipX, tipY);
       ctx.lineTo(
@@ -179,17 +196,17 @@ const CityMap = ({
       ctx.fill();
     }
 
-    // Draw ambulance along the path
     if (path.length >= 2 && isPlaying) {
       const segIndex = Math.floor(progress);
       const t = progress - segIndex;
       const a = nodes[path[Math.min(segIndex, path.length - 1)]];
       const b = nodes[path[Math.min(segIndex + 1, path.length - 1)]];
       if (a && b) {
-        const x = a.x + (b.x - a.x) * t;
-        const y = a.y + (b.y - a.y) * t;
+        const ax = tx(a.x), ay = ty(a.y);
+        const bx = tx(b.x), by = ty(b.y);
+        const x = ax + (bx - ax) * t;
+        const y = ay + (by - ay) * t;
 
-        // Pulsing halo
         ctx.beginPath();
         ctx.arc(x, y, 18 + Math.sin(performance.now() / 150) * 3, 0, Math.PI * 2);
         ctx.fillStyle = `hsl(${styles.getPropertyValue("--destructive")} / 0.2)`;
@@ -201,12 +218,12 @@ const CityMap = ({
         ctx.fillText("🚑", x, y);
       }
     }
-  }, [nodes, edges, accident, hospitals, path, progress, isPlaying]);
+  }, [nodes, edges, accident, hospitals, path, progress, isPlaying, logicalW, logicalH, minX, minY]);
 
   return (
     <canvas
       ref={canvasRef}
-      className="w-full h-[480px] rounded-lg border border-border bg-muted/30"
+      className="w-full h-[520px] rounded-lg border border-border bg-muted/30"
     />
   );
 };
